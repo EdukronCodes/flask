@@ -1,27 +1,16 @@
 # Python to Linux Web App on Azure
 # Build your Python project and deploy it to Azure as a Linux Web App.
-# Change python version to one thats appropriate for your application.
-# https://docs.microsoft.com/azure/devops/pipelines/languages/python
 
 trigger:
 - main
 
 variables:
-  # Azure Resource Manager connection created during pipeline creation
-  azureServiceConnectionId: '798df25c-1f6d-4ace-a735-c7e1602c1b7f'
-
-  # Web app name
-  webAppName: ''
-
-  # Agent VM image name
+  # Azure Resource Manager service connection name (not the ID)
+  azureServiceConnectionId: 'Edukron-Service-Connection'  # <-- Replace with actual name
+  webAppName: 'your-flask-webapp-name'                    # <-- Replace with your actual app name
   vmImageName: 'ubuntu-latest'
-
-  # Environment name
-  environmentName: ''
-
-  # Project root folder. Point to the folder containing manage.py file.
-  projectRoot: $(System.DefaultWorkingDirectory)
-
+  environmentName: 'dev'                                  # <-- Replace with your target environment name
+  projectRoot: '$(System.DefaultWorkingDirectory)'
   pythonVersion: '3.11'
 
 stages:
@@ -41,7 +30,6 @@ stages:
         python -m venv antenv
         source antenv/bin/activate
         python -m pip install --upgrade pip
-        pip install setup
         pip install -r requirements.txt
       workingDirectory: $(projectRoot)
       displayName: "Install requirements"
@@ -52,11 +40,11 @@ stages:
         rootFolderOrFile: '$(projectRoot)'
         includeRootFolder: false
         archiveType: zip
-        archiveFile: $(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip
+        archiveFile: '$(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip'
         replaceExistingArchive: true
 
-    - upload: $(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip
-      displayName: 'Upload package'
+    - publish: '$(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip'
+      displayName: 'Publish artifact'
       artifact: drop
 
 - stage: Deploy
@@ -65,22 +53,21 @@ stages:
   condition: succeeded()
   jobs:
   - deployment: DeploymentJob
+    environment: $(environmentName)
     pool:
       vmImage: $(vmImageName)
-    environment: $(environmentName)
     strategy:
       runOnce:
         deploy:
           steps:
-
           - task: UsePythonVersion@0
             inputs:
               versionSpec: '$(pythonVersion)'
             displayName: 'Use Python version'
 
           - task: AzureWebApp@1
-            displayName: 'Deploy Azure Web App : '
+            displayName: 'Deploy Azure Web App'
             inputs:
               azureSubscription: $(azureServiceConnectionId)
               appName: $(webAppName)
-              package: $(Pipeline.Workspace)/drop/$(Build.BuildId).zip
+              package: '$(Pipeline.Workspace)/drop/$(Build.BuildId).zip'
